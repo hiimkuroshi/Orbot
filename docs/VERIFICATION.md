@@ -8,6 +8,15 @@ Local checks (Linux sandbox; Python 3.14.10; Tk 8.6 on Xvfb, Inter substituted f
 - GUI smoke passed on real Tk widgets, including the footer port note and the close reminder (shown only while the port is open; Quay lại keeps Orbot open). Previews of the connection dialog, close reminder and connected footer were inspected at 96 DPI.
 - Ruff, Mypy (Linux and `--platform win32`), Bandit (no medium/high), pip-audit on requirements-lock.txt (no known vulnerabilities) and actionlint passed. PyInstaller parsed the generated version resource.
 
+Windows CI ([run 40630005679](https://github.com/hiimkuroshi/Orbot/actions/runs/40630005679), windows-latest on Windows Server 2025, Python 3.14.9):
+
+- Installed every dependency from requirements-lock.txt with `--require-hashes`.
+- Node engine suite 29 passed; Python suite 23 passed, including both Windows tests that read the real TCP table (a Python listener is named and refused, a free port has no listener).
+- GUI smoke on real Windows Tk widgets, Ruff, Mypy and Bandit (no medium/high) passed. Windows screenshots are in the run's `ui-screenshots` artifact.
+- Built `Orbot-0.2.1-windows-x64.zip` (folder app) and `Orbot-0.2.1.exe` with version information and without UPX, plus SHA256SUMS.txt. Both apps started and exited with code 0 in `--demo --smoke-test` and `--smoke-test` modes.
+- The runner's Python ships no Tk `license.terms`, so the committed licenses/Tk-LICENSE.txt was kept.
+- The release job (attestation and draft release) runs only for `v*` tags and has not run yet.
+
 Not verified: the random port and owner check against a real Discord Desktop, the SmartScreen result of the new build, and Microsoft or SignPath submissions (manual steps in PUBLISHING.md). No Quest was run or claimed.
 
 ---
