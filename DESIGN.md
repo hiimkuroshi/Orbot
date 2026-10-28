@@ -54,6 +54,8 @@ Native rectangular controls, softly rounded queue selection, consistent padding 
 ## Components
 The connection status, selected Quest detail, progress bar, and log have distinct roles. Use labeled native buttons with keyboard focus. Empty lists explain the next action. Unsupported, expired, failed, completed, and stopped Quests remain distinct.
 
+Security guidance uses an elevated callout with a 3px amber left edge, a bold amber title and body text. The connection dialog explains the debugging-port risk; the footer note turns amber while connected; closing Orbot while Discord's port is still open shows a reminder dialog (Quay lại / Đã hiểu, đóng Orbot) with the steps to quit Discord.
+
 The queue is an ordered list independent of table selection and filters. Quests can be added once, moved up/down, removed, or cleared before running. The queue tab shows position, progress and the current state, including receiving Orbs. Show the pending count on the tab and distinguish an exhausted queue from a stopped or blocked queue. Keep unfinished entries after stopping. Auto-claim is on by default, runs after confirmed completion, and does not prevent the next Quest after an ordinary claim failure.
 
 ## Do's and Don'ts
@@ -61,3 +63,4 @@ The queue is an ordered list independent of table selection and filters. Quests 
 - Never present sample Quests as real or client-side progress as server completion.
 - Disable conflicting controls while running; always keep Stop available.
 - Provide a separate, clearly labeled demo mode for offline inspection.
+- Never close Discord silently; tell the user when its debugging port is still open and how to close it.

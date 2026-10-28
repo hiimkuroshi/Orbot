@@ -252,6 +252,84 @@ def style_switch(app: Any) -> None:
     )
 
 
+def notice(parent: tk.Misc, title: str, body: str, *, wrap: int = 430) -> tk.Frame:
+    """An amber-edged callout for security guidance."""
+    frame = tk.Frame(parent, bg=COLORS["elevated"])
+    tk.Frame(frame, bg=COLORS["warning"], width=3).pack(side="left", fill="y")
+    inner = tk.Frame(frame, bg=COLORS["elevated"], padx=14, pady=11)
+    inner.pack(side="left", fill="both", expand=True)
+    label(inner, title, color="warning", size=10, bold=True, bg="elevated").pack(fill="x")
+    label(
+        inner,
+        body,
+        size=10,
+        bg="elevated",
+        wraplength=wrap,
+        justify="left",
+    ).pack(fill="x", pady=(4, 0))
+    return frame
+
+
+def show_close_reminder(app: Any, port: int, on_confirm: Any) -> None:
+    """Explain that Discord keeps its debugging port open after Orbot closes."""
+    existing = getattr(app, "close_dialog", None)
+    if existing is not None and existing.winfo_exists():
+        existing.deiconify()
+        existing.lift()
+        return
+    dialog = tk.Toplevel(app.root)
+    app.close_dialog = dialog
+    dialog.title("Đóng Orbot")
+    dialog.configure(bg=COLORS["surface"])
+    dialog.resizable(False, False)
+    dialog.transient(app.root)
+    content = tk.Frame(dialog, bg=COLORS["surface"], padx=28, pady=24)
+    content.pack(fill="both", expand=True)
+    label(content, "Discord vẫn đang mở cổng gỡ lỗi", size=17, bold=True).pack(fill="x")
+    label(
+        content,
+        f"Cổng {port} chỉ đóng khi Discord thoát hẳn. Trong lúc đó, chương trình khác "
+        "trên máy cũng có thể điều khiển Discord.",
+        color="muted",
+        wraplength=480,
+        justify="left",
+    ).pack(fill="x", pady=(8, 18))
+    notice(
+        content,
+        "Sau khi đóng Orbot",
+        "1. Chuột phải biểu tượng Discord ở khay hệ thống → Thoát Discord.\n"
+        "2. Mở lại Discord như bình thường, không qua Orbot.",
+        wrap=450,
+    ).pack(fill="x")
+    buttons = tk.Frame(content, bg=COLORS["surface"])
+    buttons.pack(fill="x", pady=(22, 0))
+
+    def cancel(_event: object = None) -> str:
+        dialog.destroy()
+        return "break"
+
+    def confirm(_event: object = None) -> str:
+        dialog.destroy()
+        on_confirm()
+        return "break"
+
+    app.close_confirm_button = ttk.Button(
+        buttons, text="Đã hiểu, đóng Orbot", style="Primary.TButton", command=confirm
+    )
+    app.close_confirm_button.pack(side="right")
+    app.close_cancel_button = ttk.Button(buttons, text="Quay lại", command=cancel)
+    app.close_cancel_button.pack(side="right", padx=(0, 10))
+    dialog.protocol("WM_DELETE_WINDOW", cancel)
+    dialog.bind("<Escape>", cancel)
+    dialog.bind("<Return>", confirm)
+    dialog.update_idletasks()
+    root = app.root
+    x = root.winfo_rootx() + max(0, (root.winfo_width() - dialog.winfo_reqwidth()) // 2)
+    y = root.winfo_rooty() + max(0, (root.winfo_height() - dialog.winfo_reqheight()) // 3)
+    dialog.geometry(f"+{x}+{y}")
+    app.close_confirm_button.focus_set()
+
+
 def toggle_log(app: Any) -> None:
     if app.log_open:
         app.notebook.select(app.log_return_tab)
@@ -272,7 +350,7 @@ def build_settings(app: Any) -> None:
     app.settings.withdraw()
     app.settings.title("Kết nối Discord · Orbot")
     app.settings.configure(bg=COLORS["surface"])
-    app.settings.geometry("530x440")
+    app.settings.geometry("540x520")
     app.settings.resizable(False, False)
     app.settings.transient(app.root)
     app.settings.protocol("WM_DELETE_WINDOW", app.settings.withdraw)
@@ -290,6 +368,16 @@ def build_settings(app: Any) -> None:
     label(port_row, "Cổng cục bộ", color="muted").pack(side="left", padx=(0, 16))
     app.port_entry = ttk.Entry(port_row, textvariable=app.port, width=8)
     app.port_entry.pack(side="left")
+    label(port_row, "Tự chọn ngẫu nhiên khi mở Discord", color="muted", size=9).pack(
+        side="left", padx=(12, 0)
+    )
+    notice(
+        content,
+        "Lưu ý bảo mật",
+        "Khi Discord mở cổng này, chương trình khác trên máy cũng có thể điều khiển "
+        "Discord. Dùng xong, hãy thoát Discord ở khay hệ thống rồi mở lại như bình "
+        "thường để đóng cổng.",
+    ).pack(fill="x", pady=(16, 0))
     buttons = tk.Frame(content, bg=COLORS["surface"])
     buttons.pack(fill="x", pady=18)
     app.launch_button = ttk.Button(buttons, text="Mở Discord", command=app.open_discord)
@@ -424,15 +512,8 @@ def build_workspace(app: Any) -> None:
         size=9,
         bg="canvas",
     ).pack(side="left")
-    label(
-        footer,
-        "Dữ liệu minh họa · Không chạy Quest thật"
-        if app.demo_mode
-        else "Phiên đăng nhập giữ trong Discord",
-        color="primary" if app.demo_mode else "muted",
-        size=9,
-        bg="canvas",
-    ).pack(side="right")
+    app.footer_note = label(footer, color="muted", size=9, bg="canvas")
+    app.footer_note.pack(side="right")
     build_settings(app)
     app._controls()
 
@@ -843,6 +924,14 @@ def sync_controls(app: Any) -> None:
     )
     account = "Tài khoản demo" if app.demo_mode else app.account_name
     app.account_label.configure(text=account[:28] if app.connected else "Discord Desktop")
+    if app.demo_mode:
+        note, ink = "Dữ liệu minh họa · Không chạy Quest thật", "primary"
+    elif app.connected and app.debug_port:
+        note = f"Cổng gỡ lỗi {app.debug_port} đang mở · Thoát Discord khi dùng xong"
+        ink = "warning"
+    else:
+        note, ink = "Phiên đăng nhập giữ trong Discord", "muted"
+    app.footer_note.configure(text=note, fg=COLORS[ink])
     app.queue_table.set_active(app.active_id)
 
 

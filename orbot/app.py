@@ -10,10 +10,19 @@ from tkinter import filedialog, ttk
 from typing import Any
 
 from orbot import demo
+from orbot.cdp import port_status
 from orbot.controller import Controller
 from orbot.launcher import launch_discord
+from orbot.ports import choose_port, port_in_use
+from orbot.settings import load_port, save_port
 from orbot.ui import COLORS, ProgressBar, QueueList
-from orbot.workspace import build_workspace, style_workspace, sync_controls, sync_focus
+from orbot.workspace import (
+    build_workspace,
+    show_close_reminder,
+    style_workspace,
+    sync_controls,
+    sync_focus,
+)
 
 STATUS = {
     "ready": "Sẵn sàng",
@@ -75,7 +84,13 @@ class OrbotApp:
         self.running = False
         self.busy = False
         self.closing = False
-        self.port = tk.StringVar(value="9222")
+        saved_port = None if demo_mode else load_port()
+        self.port = tk.StringVar(value=str(saved_port) if saved_port else "")
+        # The value Orbot filled in itself; a different value means the user typed a port.
+        self.auto_port = self.port.get()
+        # The debugging port Orbot opened or connected to in this session.
+        self.debug_port: int | None = None
+        self.connect_port: int | None = None
         self.kind = tk.StringVar(value="Tất cả")
         self.auto_claim = tk.BooleanVar(value=True)
         self.connection_text = tk.StringVar(value="Chưa kết nối Discord")
@@ -85,6 +100,7 @@ class OrbotApp:
         self.setup_text = tk.StringVar(
             value=(
                 "Lần đầu: thoát Discord ở khay hệ thống → Mở Discord → Kết nối. "
+                "Mỗi lần mở, Orbot chọn một cổng ngẫu nhiên và nhớ cho lần kết nối sau. "
                 "Kết nối có thể mở Quest Home và tải lại giao diện Discord một lần."
             )
         )
@@ -108,14 +124,25 @@ class OrbotApp:
         build_workspace(self)
 
     def _port(self) -> int | None:
+        text = self.port.get().strip()
+        if not text:
+            self._log("Chưa có cổng kết nối. Bấm Mở Discord để Orbot chọn cổng.", "warning")
+            return None
         try:
-            port = int(self.port.get())
+            port = int(text)
             if not 1024 <= port <= 65535:
                 raise ValueError
             return port
         except ValueError:
             self._log("Cổng phải là số từ 1024 đến 65535.", "error")
             return None
+
+    def _remember_port(self, port: int) -> None:
+        self.port.set(str(port))
+        self.auto_port = str(port)
+        self.debug_port = port
+        if not save_port(port):
+            self._log("Không lưu được cổng; lần sau hãy nhập lại cổng này.", "warning")
 
     def _log(self, text: str, level: str = "info") -> None:
         self.log_text.configure(state="normal")
@@ -171,9 +198,29 @@ class OrbotApp:
         sync_controls(self)
 
     def open_discord(self) -> None:
-        port = self._port()
-        if port is None:
+        text = self.port.get().strip()
+        custom = bool(text) and text != self.auto_port
+        port = self._port() if text else None
+        if text and port is None:
             return
+        status = port_status(port) if port else "free"
+        if port and status == "discord":
+            self._remember_port(port)
+            self._log(f"Discord đang mở cổng {port}. Bấm Kết nối.")
+            return
+        if port and custom and status == "other":
+            self._log(
+                f"Cổng {port} đang do chương trình khác dùng. "
+                "Nhập cổng khác hoặc xóa trống để Orbot tự chọn.",
+                "error",
+            )
+            return
+        if not port or not custom:
+            try:
+                port = choose_port()
+            except OSError as exc:
+                self._log(str(exc), "error")
+                return
         try:
             launch_discord(port)
         except FileNotFoundError:
@@ -190,12 +237,14 @@ class OrbotApp:
         except (OSError, ValueError) as exc:
             self._log(str(exc), "error")
             return
-        self._log("Đã gửi lệnh mở Discord. Khi cửa sổ sẵn sàng, bấm Kết nối.")
+        self._remember_port(port)
+        self._log(f"Đã gửi lệnh mở Discord với cổng {port}. Khi cửa sổ sẵn sàng, bấm Kết nối.")
         self._log("Nếu Discord đã chạy sẵn, hãy thoát ở khay hệ thống rồi bấm Mở Discord lại.")
 
     def connect(self) -> None:
         port = self._port()
         if port is not None and self.controller and not self.busy and not self.running:
+            self.connect_port = port
             self.busy = True
             self.connection_text.set("Đang kết nối…")
             self._controls()
@@ -515,6 +564,9 @@ class OrbotApp:
                 if event == "snapshot":
                     if isinstance(payload, dict):
                         self.apply_snapshot(payload)
+                        if self.connected and self.connect_port:
+                            self._remember_port(self.connect_port)
+                            self.connect_port = None
                     else:
                         self._log("Phiên Discord đã tải lại. Hãy kết nối lại.", "warning")
                         self.disconnect()
@@ -558,6 +610,15 @@ class OrbotApp:
                 self._log(f"Không lưu được nhật ký: {exc}", "error")
 
     def close(self) -> None:
+        if self.closing:
+            return
+        if self.debug_port and not self.demo_mode and port_in_use(self.debug_port):
+            # Closing Orbot does not close Discord's debugging port; say so before leaving.
+            show_close_reminder(self, self.debug_port, self._close_now)
+            return
+        self._close_now()
+
+    def _close_now(self) -> None:
         if self.closing:
             return
         self.closing = True

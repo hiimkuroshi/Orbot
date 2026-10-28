@@ -1,7 +1,9 @@
 @echo off
 cd /d "%~dp0"
-if exist "dist\Orbot-0.2.0.exe" (
-    start "" "dist\Orbot-0.2.0.exe"
+set "ORBOT_EXE="
+for %%F in ("dist\Orbot-*.exe") do set "ORBOT_EXE=%%~fF"
+if defined ORBOT_EXE (
+    start "" "%ORBOT_EXE%"
     exit /b 0
 )
 if exist ".venv\Scripts\pythonw.exe" (
@@ -9,5 +11,5 @@ if exist ".venv\Scripts\pythonw.exe" (
     start "" ".venv\Scripts\pythonw.exe" "run_orbot.py"
     exit /b 0
 )
-echo Run scripts\build.ps1 or install requirements in .venv first.
+echo Run scripts\build.ps1 or install requirements-lock.txt in .venv first.
 pause

@@ -1,5 +1,6 @@
 """Exercise the real desktop widgets using explicitly labeled sample data."""
 
+import socket
 import sys
 import tkinter as tk
 from pathlib import Path
@@ -163,6 +164,38 @@ assert app.help_label.winfo_rooty() + app.help_label.winfo_height() < (
     app.settings.winfo_rooty() + app.settings.winfo_height()
 )
 app.settings.withdraw()
+assert app.port.get() == "", "Demo must not load or reuse a saved debugging port"
+
+
+def show_open_port_reminder() -> socket.socket:
+    """Simulate Discord still listening on the session's debugging port, then close Orbot."""
+    listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    listener.bind(("127.0.0.1", 0))
+    listener.listen()
+    app.demo_mode = False
+    app.debug_port = listener.getsockname()[1]
+    app._controls()
+    app.close()
+    root.update()
+    return listener
+
+
+def dismiss_open_port_reminder(listener: socket.socket) -> None:
+    app.close_cancel_button.invoke()
+    root.update()
+    listener.close()
+    app.demo_mode = True
+    app.debug_port = None
+    app._controls()
+
+
+listener = show_open_port_reminder()
+assert str(app.debug_port) in app.footer_note.cget("text"), "Footer must show the open port"
+assert app.close_dialog.winfo_exists() and app.close_confirm_button.winfo_viewable()
+assert not app.closing, "Closing must wait while Discord's debugging port is open"
+dismiss_open_port_reminder(listener)
+assert not app.close_dialog.winfo_exists() and not app.closing
+assert "minh họa" in app.footer_note.cget("text")
 app._log("Thông báo lỗi kiểm thử giao diện.", "error")
 assert app.activity_label.cget("fg") == COLORS["error"]
 assert "Thông báo lỗi" in app.activity_text.get()
@@ -206,6 +239,11 @@ if "--screenshot" in sys.argv:
         output_dir / "connection-settings.png"
     )
     app.settings.withdraw()
+    listener = show_open_port_reminder()
+    root.after(200, root.quit)
+    root.mainloop()
+    ImageGrab.grab(window=int(app.close_dialog.frame(), 0)).save(output_dir / "close-reminder.png")
+    dismiss_open_port_reminder(listener)
 root.destroy()
 print(
     "GUI smoke: queue editing/order, full-queue submission, "

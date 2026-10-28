@@ -1,5 +1,14 @@
 # Lịch sử thay đổi Orbot
 
+## 0.2.1: Bảo mật và phát hành minh bạch
+
+- Mỗi lần Mở Discord, Orbot chọn một cổng gỡ lỗi ngẫu nhiên (20000–48999) thay vì `9222` và nhớ cổng này trong `%LOCALAPPDATA%\Orbot\settings.json`. Nếu Discord đã mở cổng, Orbot dùng lại thay vì mở Discord lần nữa.
+- Trên Windows, chỉ kết nối khi chương trình đang giữ cổng là Discord; từ chối và nêu tên nếu là chương trình khác hoặc không xác minh được.
+- Cảnh báo bảo mật trong hộp kết nối, ghi chú "Cổng gỡ lỗi đang mở" ở chân trang, và hộp nhắc thoát Discord khi đóng Orbot nếu cổng vẫn mở.
+- Sửa lỗi phản hồi sai định dạng từ cổng kết nối làm luồng nền dừng hẳn và Orbot không đóng được.
+- Build trên GitHub Actions với thư viện ghim mã băm, Action ghim theo commit, chứng nhận nguồn gốc và bản nháp phát hành. Thêm bản ZIP dạng thư mục (khuyên dùng), EXE có thông tin phiên bản, không nén UPX.
+- Thêm SECURITY.md và hướng dẫn phát hành, xử lý cảnh báo SmartScreen trong docs/PUBLISHING.md.
+
 ## 0.2.0: Focus Flow
 
 - Giao diện slate/amber theo concept 3, hàng đợi bên trái và tiến độ ở vùng trọng tâm.
