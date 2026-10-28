@@ -87,6 +87,9 @@ class FixtureHandler(BaseHTTPRequestHandler):
 class CDPTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
+        # The fixture server is Python, not Discord; the owner check has its own tests.
+        cls.owner_check = patch("orbot.ports.OWNER_CHECK", False)
+        cls.owner_check.start()
         cls.server = ThreadingHTTPServer(("127.0.0.1", 0), FixtureHandler)
         cls.thread = threading.Thread(target=cls.server.serve_forever, daemon=True)
         cls.thread.start()
@@ -95,6 +98,7 @@ class CDPTests(unittest.TestCase):
     def tearDownClass(cls) -> None:
         cls.server.shutdown()
         cls.server.server_close()
+        cls.owner_check.stop()
 
     def test_discovers_only_real_discord_targets_and_handles_events(self) -> None:
         targets = discover_targets(self.server.server_port)

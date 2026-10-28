@@ -11,11 +11,55 @@ from urllib.request import HTTPRedirectHandler, ProxyHandler, build_opener
 
 import websocket
 
+from orbot import ports
+
 DISCORD_HOSTS = {"discord.com", "canary.discord.com", "ptb.discord.com", "discordapp.com"}
+NOT_FOUND = (
+    "Chưa tìm thấy cổng kết nối. Thoát Discord ở khay hệ thống, bấm Mở Discord, rồi bấm Kết nối."
+)
+INVALID_REPLY = "Discord trả về phản hồi không hợp lệ. Hãy kết nối lại."
 
 
 class ConnectionError(RuntimeError):
     """An actionable local connection error."""
+
+
+def verify_listener(port: int) -> None:
+    """Refuse a port that is held by any program other than Discord (Windows only)."""
+    if not ports.OWNER_CHECK:
+        return
+    try:
+        owners = ports.listening_executables(port)
+    except OSError as exc:
+        raise ConnectionError(
+            f"Không xác minh được chương trình đang giữ cổng {port}, nên Orbot không kết nối. "
+            "Hãy thoát Discord ở khay hệ thống rồi bấm Mở Discord."
+        ) from exc
+    if not owners:
+        raise ConnectionError(NOT_FOUND)
+    strangers = sorted({path.name for path in owners if not ports.is_discord(path)})
+    if strangers:
+        raise ConnectionError(
+            f"Cổng {port} đang do {', '.join(strangers)} giữ, không phải Discord. "
+            "Orbot từ chối kết nối. Xóa ô cổng rồi bấm Mở Discord để chọn cổng khác."
+        )
+
+
+def port_status(port: int) -> str:
+    """Classify a port as "free", "discord" or "other" without changing anything."""
+    if not ports.port_in_use(port):
+        return "free"
+    if ports.OWNER_CHECK:
+        try:
+            owners = ports.listening_executables(port)
+        except OSError:
+            return "other"
+        return "discord" if owners and all(map(ports.is_discord, owners)) else "other"
+    try:
+        discover_targets(port)
+    except ConnectionError:
+        return "other"
+    return "discord"
 
 
 class NoRedirect(HTTPRedirectHandler):
@@ -31,16 +75,14 @@ def valid_discord_url(value: str) -> bool:
 def discover_targets(port: int) -> list[dict[str, Any]]:
     if not 1024 <= port <= 65535:
         raise ConnectionError("Cổng phải nằm trong khoảng 1024–65535.")
+    verify_listener(port)
     opener = build_opener(ProxyHandler({}), NoRedirect())
     try:
         # The URL has a fixed loopback host; neither a proxy nor a remote host is accepted.
         with opener.open(f"http://127.0.0.1:{port}/json/list", timeout=3) as response:
             payload = json.loads(response.read(2_000_000))
     except (OSError, ValueError) as exc:
-        raise ConnectionError(
-            "Chưa tìm thấy cổng kết nối. Thoát Discord ở khay hệ thống, "
-            "bấm Mở Discord, rồi bấm Kết nối."
-        ) from exc
+        raise ConnectionError(NOT_FOUND) from exc
     if not isinstance(payload, list):
         raise ConnectionError("Cổng này không trả về danh sách cửa sổ Discord.")
     targets = [
@@ -97,11 +139,16 @@ class DiscordConnection:
             if not raw:
                 raise ConnectionError("Discord đã đóng kết nối.")
             message = json.loads(raw)
-            if message.get("id") != request_id:
+            if not isinstance(message, dict) or message.get("id") != request_id:
                 continue
             if "error" in message:
-                raise ConnectionError(str(message["error"].get("message", "CDP error")))
-            return dict(message.get("result", {}))
+                error = message["error"]
+                detail = error.get("message") if isinstance(error, dict) else error
+                raise ConnectionError(str(detail or "CDP error")[:300])
+            result = message.get("result", {})
+            if not isinstance(result, dict):
+                raise ConnectionError(INVALID_REPLY)
+            return result
         raise ConnectionError("Hết thời gian chờ Discord phản hồi.")
 
     def evaluate(self, expression: str, *, await_promise: bool = False) -> Any:
@@ -116,6 +163,8 @@ class DiscordConnection:
         if result.get("exceptionDetails"):
             raise ConnectionError("Mã kết nối chưa tương thích với bản Discord này.")
         remote = result.get("result", {})
+        if not isinstance(remote, dict):
+            raise ConnectionError(INVALID_REPLY)
         if remote.get("subtype") == "error":
             raise ConnectionError("Discord từ chối thao tác kết nối.")
         return remote.get("value")
@@ -124,7 +173,9 @@ class DiscordConnection:
         source = Path(__file__).with_name("engine.js").read_text(encoding="utf-8")
         self.evaluate(source)
         result = self.command("discover")
-        return dict(result)
+        if not isinstance(result, dict):
+            raise ConnectionError(INVALID_REPLY)
+        return result
 
     def prepare_reload(self) -> None:
         source = Path(__file__).with_name("capture.js").read_text(encoding="utf-8")

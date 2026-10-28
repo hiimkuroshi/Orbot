@@ -11,6 +11,21 @@ import websocket
 
 from orbot.cdp import ConnectionError, DiscordConnection, discover_targets
 
+EXPECTED_ERRORS = (
+    OSError,
+    RuntimeError,
+    ValueError,
+    TypeError,
+    KeyError,
+    websocket.WebSocketException,
+)
+
+
+def _describe(exc: Exception) -> str:
+    if isinstance(exc, EXPECTED_ERRORS):
+        return str(exc)
+    return f"Lỗi không mong đợi ({type(exc).__name__}). Đã ngắt kết nối; hãy kết nối lại."
+
 
 class Controller:
     def __init__(self) -> None:
@@ -68,8 +83,8 @@ class Controller:
         if self.connection:
             try:
                 self.connection.close()
-            except (OSError, RuntimeError, websocket.WebSocketException):
-                pass
+            except Exception:  # Cleanup must never stop the worker; the socket is dropped.
+                pass  # nosec B110
             self.connection = None
 
     def _work(self) -> None:
@@ -90,22 +105,17 @@ class Controller:
                 elif self.connection:
                     operation = {"poll": "snapshot", "refresh": "discover"}.get(command, command)
                     self.events.put(("snapshot", self.connection.command(operation, argument)))
-            except (
-                OSError,
-                RuntimeError,
-                ValueError,
-                TypeError,
-                KeyError,
-                websocket.WebSocketException,
-            ) as exc:
-                self.events.put(("error", str(exc)))
+            except Exception as exc:  # The worker must survive so Stop and Close still work.
+                self.events.put(("error", _describe(exc)))
                 self._disconnect()
                 self.events.put(("disconnected", None))
             finally:
                 if command != "poll":
                     self.events.put(("idle", command))
-        self._disconnect()
-        self.events.put(("closed", None))
+        try:
+            self._disconnect()
+        finally:
+            self.events.put(("closed", None))
 
     def close(self) -> None:
         # Interrupt connection setup promptly; the worker still performs engine cleanup.
