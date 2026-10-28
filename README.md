@@ -119,7 +119,7 @@ Kiểm thử socket cần được phép kết nối `127.0.0.1`. Mỗi lần pu
 
 ```text
 Orbot/
-├── .github/workflows/     # CI: kiểm tra, build, chứng nhận và bản nháp phát hành
+├── .github/workflows/     # CI: kiểm tra, build, chứng nhận và phát hành khi có tag
 ├── Start-Orbot.cmd        # Mở bản chạy hiện tại
 ├── SECURITY.md            # Rủi ro bảo mật và cách báo lỗ hổng
 ├── orbot/                # Mã nguồn và tài nguyên ứng dụng

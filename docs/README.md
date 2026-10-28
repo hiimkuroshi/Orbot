@@ -4,7 +4,7 @@
 - [Hướng dẫn bản EXE](RELEASE.md): hướng dẫn ngắn, được chép vào dist khi build.
 - [Thiết kế Focus Flow](../DESIGN.md): màu sắc, chữ, bố cục và trạng thái giao diện.
 - [Bảo mật](../SECURITY.md): rủi ro cổng gỡ lỗi, biện pháp và cách báo lỗ hổng.
-- [Phát hành](PUBLISHING.md): quy trình tag → CI → bản nháp, cảnh báo SmartScreen, ký số miễn phí.
+- [Phát hành](PUBLISHING.md): quy trình tag → CI → phát hành, cảnh báo SmartScreen, ký số miễn phí.
 - [Kiểm chứng](VERIFICATION.md): kết quả kiểm thử và giới hạn đã xác minh.
 - [Lịch sử thay đổi](CHANGELOG.md): các thay đổi đã triển khai qua từng bản.
 - [Ba concept UI](design/concepts/README.md): ảnh và prompt trước khi chọn Focus Flow.

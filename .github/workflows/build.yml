@@ -77,7 +77,7 @@ jobs:
           retention-days: 30
 
   release:
-    name: Attest and draft release
+    name: Attest and publish release
     if: startsWith(github.ref, 'refs/tags/v')
     needs: build
     runs-on: ubuntu-latest
@@ -104,7 +104,7 @@ jobs:
             dist/*.exe
             dist/*.zip
 
-      - name: Create draft release
+      - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
@@ -123,5 +123,5 @@ jobs:
           Thay đổi: docs/CHANGELOG.md.
           EOF
           gh release create "$TAG" dist/*.exe dist/*.zip dist/SHA256SUMS.txt \
-            --repo "$GITHUB_REPOSITORY" --draft --verify-tag \
+            --repo "$GITHUB_REPOSITORY" --verify-tag --latest \
             --title "Orbot ${version}" --notes-file notes.md

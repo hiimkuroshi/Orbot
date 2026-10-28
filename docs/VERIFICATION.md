@@ -15,7 +15,7 @@ Windows CI ([run 40630005679](https://github.com/hiimkuroshi/Orbot/actions/runs/
 - GUI smoke on real Windows Tk widgets, Ruff, Mypy and Bandit (no medium/high) passed. Windows screenshots are in the run's `ui-screenshots` artifact.
 - Built `Orbot-0.2.1-windows-x64.zip` (folder app) and `Orbot-0.2.1.exe` with version information and without UPX, plus SHA256SUMS.txt. Both apps started and exited with code 0 in `--demo --smoke-test` and `--smoke-test` modes.
 - The runner's Python ships no Tk `license.terms`, so the committed licenses/Tk-LICENSE.txt was kept.
-- The release job (attestation and draft release) runs only for `v*` tags and has not run yet.
+- The release job (attestation and published release) runs only for `v*` tags and had not run at this point.
 
 Not verified: the random port and owner check against a real Discord Desktop, the SmartScreen result of the new build, and Microsoft or SignPath submissions (manual steps in PUBLISHING.md). No Quest was run or claimed.
 
