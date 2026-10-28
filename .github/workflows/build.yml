@@ -6,19 +6,27 @@ on:
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
+    inputs:
+      release:
+        description: "Phát hành phiên bản trong orbot/__init__.py (chỉ trên main)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  # Never cancel a release run; newer pushes replace older test runs.
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') && github.event_name != 'workflow_dispatch' }}
 
 jobs:
   build:
     name: Verify and build
     runs-on: windows-latest
     timeout-minutes: 40
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     defaults:
       run:
         shell: pwsh
@@ -39,13 +47,25 @@ jobs:
           .venv\Scripts\python.exe -m pip install --disable-pip-version-check `
             --require-hashes --only-binary :all: -r requirements-lock.txt
 
-      - name: Check that the tag matches the app version
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Read the app version and check the release tag
+        id: version
         env:
-          TAG: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+          RELEASE: ${{ github.event_name == 'workflow_dispatch' && inputs.release }}
         run: |
           $version = .venv\Scripts\python.exe -c "from orbot import __version__; print(__version__)"
-          if ("v$version" -ne $env:TAG) { throw "Tag $env:TAG does not match app version $version." }
+          if ($env:REF_TYPE -eq 'tag' -and "v$version" -ne $env:REF_NAME) {
+            throw "Tag $env:REF_NAME does not match app version $version."
+          }
+          if ($env:RELEASE -eq 'true') {
+            if ($env:REF_NAME -ne 'main') { throw 'Releases can only be started from main.' }
+            git ls-remote --exit-code --tags origin "refs/tags/v$version" | Out-Null
+            $exists = $LASTEXITCODE -eq 0
+            $global:LASTEXITCODE = 0
+            if ($exists) { throw "Tag v$version already exists. Raise the version in orbot/__init__.py first." }
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
 
       - name: Run tests, lint, types and security checks
         run: ./scripts/verify.ps1
@@ -78,7 +98,9 @@ jobs:
 
   release:
     name: Attest and publish release
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: >-
+      startsWith(github.ref, 'refs/tags/v') ||
+      (github.event_name == 'workflow_dispatch' && inputs.release && github.ref == 'refs/heads/main')
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -107,9 +129,10 @@ jobs:
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
+          VERSION: ${{ needs.build.outputs.version }}
         run: |
-          version="${TAG#v}"
+          version="$VERSION"
+          tag="v${version}"
           cat > notes.md <<EOF
           **Khuyên dùng:** tải \`Orbot-${version}-windows-x64.zip\`, giải nén rồi mở \`Orbot.exe\`.
           Bản một file: \`Orbot-${version}.exe\`.
@@ -122,6 +145,8 @@ jobs:
 
           Thay đổi: docs/CHANGELOG.md.
           EOF
-          gh release create "$TAG" dist/*.exe dist/*.zip dist/SHA256SUMS.txt \
-            --repo "$GITHUB_REPOSITORY" --verify-tag --latest \
+          # A pushed tag must already exist; a release started from main creates the tag on this commit.
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then source=(--verify-tag); else source=(--target "$GITHUB_SHA"); fi
+          gh release create "$tag" dist/*.exe dist/*.zip dist/SHA256SUMS.txt \
+            --repo "$GITHUB_REPOSITORY" "${source[@]}" --latest \
             --title "Orbot ${version}" --notes-file notes.md

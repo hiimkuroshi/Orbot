@@ -6,7 +6,7 @@
 - Trên Windows, chỉ kết nối khi chương trình đang giữ cổng là Discord; từ chối và nêu tên nếu là chương trình khác hoặc không xác minh được.
 - Cảnh báo bảo mật trong hộp kết nối, ghi chú "Cổng gỡ lỗi đang mở" ở chân trang, và hộp nhắc thoát Discord khi đóng Orbot nếu cổng vẫn mở.
 - Sửa lỗi phản hồi sai định dạng từ cổng kết nối làm luồng nền dừng hẳn và Orbot không đóng được.
-- Build trên GitHub Actions với thư viện ghim mã băm, Action ghim theo commit, chứng nhận nguồn gốc và tự công bố bản phát hành khi đẩy tag. Thêm bản ZIP dạng thư mục (khuyên dùng), EXE có thông tin phiên bản, không nén UPX.
+- Build trên GitHub Actions với thư viện ghim mã băm, Action ghim theo commit, chứng nhận nguồn gốc và công bố bản phát hành bằng nút Run workflow trên tab Actions hoặc khi đẩy tag. Thêm bản ZIP dạng thư mục (khuyên dùng), EXE có thông tin phiên bản, không nén UPX.
 - Thêm SECURITY.md và hướng dẫn phát hành, xử lý cảnh báo SmartScreen trong docs/PUBLISHING.md.
 
 ## 0.2.0: Focus Flow
