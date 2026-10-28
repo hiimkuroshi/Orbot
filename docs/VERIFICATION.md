@@ -1,3 +1,17 @@
+# Verification · Orbot 0.2.1 security update · 28 October 2026
+
+Local checks (Linux sandbox; Python 3.14.10; Tk 8.6 on Xvfb, Inter substituted for Segoe UI):
+
+- Reproduced before the fix: any local process could read a page secret through an unauthenticated Chromium DevTools port, while a WebSocket with a web `Origin` was rejected (403). Also reproduced: a CDP error sent as text killed the worker thread, after which Orbot could not close normally.
+- Node engine suite: 29 passed. Python suite: 23 tests, 21 passed and 2 Windows-only tests skipped locally (they read the real Windows TCP table and run in CI).
+- New tests cover malformed CDP replies, the worker surviving unexpected errors, owner checks (Discord accepted; other, mixed, unknown and missing listeners refused; no HTTP request before the check), port classification, port settings and random port selection.
+- GUI smoke passed on real Tk widgets, including the footer port note and the close reminder (shown only while the port is open; Quay lại keeps Orbot open). Previews of the connection dialog, close reminder and connected footer were inspected at 96 DPI.
+- Ruff, Mypy (Linux and `--platform win32`), Bandit (no medium/high), pip-audit on requirements-lock.txt (no known vulnerabilities) and actionlint passed. PyInstaller parsed the generated version resource.
+
+Not verified: the random port and owner check against a real Discord Desktop, the SmartScreen result of the new build, and Microsoft or SignPath submissions (manual steps in PUBLISHING.md). No Quest was run or claimed.
+
+---
+
 # Verification · Orbot 0.2.0 Focus Flow · 26 October 2026
 
 GitHub release verification, 26 October 2026:
