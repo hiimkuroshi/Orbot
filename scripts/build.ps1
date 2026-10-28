@@ -27,13 +27,23 @@ if ($LASTEXITCODE -ne 0) { throw 'Version resource generation failed.' }
 $orbotBase = & $orbotPython -c 'import sys; print(sys.base_prefix)'
 $orbotLicenses = Join-Path $projectRoot 'licenses'
 New-Item -ItemType Directory -Path $orbotLicenses -Force | Out-Null
-$tkLicense = Get-ChildItem -LiteralPath (Join-Path $orbotBase 'tcl') -Filter 'license.terms' -Recurse |
+function Update-OrbotLicense([string]$Source, [string]$Name) {
+    # Refresh a notice from the installed package; Python builds differ in what they ship.
+    $target = Join-Path $orbotLicenses $Name
+    if ($Source -and (Test-Path -LiteralPath $Source)) {
+        Copy-Item -LiteralPath $Source -Destination $target
+    } elseif (Test-Path -LiteralPath $target) {
+        Write-Warning "Keeping the committed $Name; this Python installation has no copy."
+    } else {
+        throw "Missing license notice $Name."
+    }
+}
+$tkLicense = Get-ChildItem -LiteralPath $orbotBase -Filter 'license.terms' -Recurse -ErrorAction SilentlyContinue |
     Where-Object { $_.Directory.Name -like 'tk*' } | Select-Object -First 1
-if (-not $tkLicense) { throw 'Cannot find the Tk license in the Python installation.' }
-Copy-Item -LiteralPath (Join-Path $orbotBase 'LICENSE.txt') -Destination (Join-Path $orbotLicenses 'Python-LICENSE.txt')
-Copy-Item -LiteralPath $tkLicense.FullName -Destination (Join-Path $orbotLicenses 'Tk-LICENSE.txt')
-Copy-Item -LiteralPath '.venv\Lib\site-packages\websocket_client-1.9.2.dist-info\licenses\LICENSE' -Destination (Join-Path $orbotLicenses 'websocket-client-LICENSE.txt')
-Copy-Item -LiteralPath '.venv\Lib\site-packages\pillow-13.0.0.dist-info\licenses\LICENSE' -Destination (Join-Path $orbotLicenses 'Pillow-LICENSE.txt')
+Update-OrbotLicense (Join-Path $orbotBase 'LICENSE.txt') 'Python-LICENSE.txt'
+Update-OrbotLicense $(if ($tkLicense) { $tkLicense.FullName } else { '' }) 'Tk-LICENSE.txt'
+Update-OrbotLicense '.venv\Lib\site-packages\websocket_client-1.9.2.dist-info\licenses\LICENSE' 'websocket-client-LICENSE.txt'
+Update-OrbotLicense '.venv\Lib\site-packages\pillow-13.0.0.dist-info\licenses\LICENSE' 'Pillow-LICENSE.txt'
 
 $commonArguments = @(
     '-m', 'PyInstaller', '--noconfirm', '--windowed', '--noupx',
@@ -75,3 +85,17 @@ $sums = foreach ($artifact in $artifacts) {
 [System.IO.File]::WriteAllText((Join-Path $projectRoot 'dist\SHA256SUMS.txt'), (($sums -join "`n") + "`n"))
 foreach ($artifact in $artifacts) { Write-Output "[OK] dist\$($artifact.Name)" }
 Write-Output '[OK] dist\SHA256SUMS.txt'
+
+# Start both packaged apps (demo and normal) and require a clean exit.
+foreach ($exe in @("dist\$OutputName.exe", 'build\onedir\Orbot\Orbot.exe')) {
+    foreach ($mode in @('--demo --smoke-test', '--smoke-test')) {
+        $process = Start-Process -FilePath $exe -ArgumentList $mode -PassThru
+        $null = $process.Handle  # Keep the handle so the exit code stays readable.
+        if (-not $process.WaitForExit(120000)) {
+            $process.Kill()
+            throw "$exe $mode did not exit."
+        }
+        if ($process.ExitCode -ne 0) { throw "$exe $mode exited with code $($process.ExitCode)." }
+        Write-Output "[OK] $exe $mode"
+    }
+}
