@@ -4,14 +4,16 @@
 
 1. Cập nhật `orbot/__init__.py` và [CHANGELOG.md](CHANGELOG.md), merge vào `main`.
 2. Thử bản build trước khi phát hành: mở lần chạy **Build Windows** của commit trên `main`, tải `orbot-windows-x64` trong mục **Artifacts** và thử với Discord thật.
-3. Tạo tag trùng phiên bản rồi đẩy lên:
+3. Phát hành trên web, không cần git: mở tab **Actions → Build Windows → Run workflow**, giữ nhánh `main`, đánh dấu **Phát hành phiên bản trong orbot/__init__.py**, rồi bấm **Run workflow**.
+
+   Hoặc, từ máy có bản clone, đẩy tag trùng phiên bản:
 
    ```bash
    git tag v0.2.1
    git push origin v0.2.1
    ```
 
-4. Workflow [Build Windows](../.github/workflows/build.yml) chạy kiểm thử, build ZIP dạng thư mục và EXE một file, kiểm tra `SHA256SUMS.txt`, tạo chứng nhận nguồn gốc (attestation) rồi **công bố ngay** bản phát hành và đánh dấu Latest. Workflow dừng nếu tag khác phiên bản trong mã.
+4. Workflow [Build Windows](../.github/workflows/build.yml) chạy kiểm thử, build ZIP dạng thư mục và EXE một file, kiểm tra `SHA256SUMS.txt`, tạo chứng nhận nguồn gốc (attestation) rồi **công bố ngay** bản phát hành và đánh dấu Latest. Workflow dừng nếu tag khác phiên bản trong mã, nếu nút phát hành được bấm trên nhánh khác `main`, hoặc nếu tag của phiên bản đã tồn tại.
 
 Không phát hành file build trên máy cá nhân. Nếu bản phát hành có lỗi, sửa trong Releases (chuyển về bản nháp hoặc xóa) rồi phát hành bản vá với phiên bản mới.
 
